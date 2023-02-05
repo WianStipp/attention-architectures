@@ -9,7 +9,7 @@ class MultiHeadAttention(nn.Module):
     self.d_k = d_k
     self.d_v = d_v
     self.d_o = d_o
-    self.heads: List[Attention] = [Attention(d_model, d_k, d_v) for _ in range(n_heads)]
+    self.heads: List[Attention] = nn.ModuleList([Attention(d_model, d_k, d_v) for _ in range(n_heads)])
     self.output_projection = nn.Linear(n_heads * d_v, d_model)
 
   def forward(self, Q: T.Tensor, K: T.Tensor, V: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:

@@ -27,7 +27,7 @@ class Encoder(nn.Module):
     super().__init__()
     self.lut = nn.Embedding(vocab_size, d_model)
     self.d_model = d_model
-    self.encoder_blocks = [EncoderBlock(d_model, d_k, d_v, n_heads, dim_feedfwd) for _ in range(n_encoder_blocks)]
+    self.encoder_blocks = nn.ModuleList([EncoderBlock(d_model, d_k, d_v, n_heads, dim_feedfwd) for _ in range(n_encoder_blocks)])
     self.positional_encoder = positional_encoding.PositionalEncoding(d_model)
 
   def forward(self, tokens: T.Tensor, attention_mask: Optional[T.Tensor] = None) -> T.Tensor:

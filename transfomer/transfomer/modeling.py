@@ -36,9 +36,9 @@ class Transformer(nn.Module):
 
   def forward(self, input_tokens: T.Tensor, decoded_tokens: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
     encoder_output = self.encoder(input_tokens, mask)
-    decoder_output = self.decoder(encoder_output, decoded_tokens, mask)
-    logits = self.linear(decoder_output) # (BS, vocab_size)
-    return F.softmax(logits, dim=1)
+    decoder_output = self.decoder(encoder_output, decoded_tokens, mask) # (BS, n_toks, d_model)
+    logits = self.linear(decoder_output[:, -1, :]) # (BS, vocab_size)
+    return logits
 
 if __name__ == "__main__":
   import tiktoken

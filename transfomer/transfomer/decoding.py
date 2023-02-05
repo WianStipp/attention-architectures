@@ -12,7 +12,7 @@ class Decoder(nn.Module):
     super().__init__()
     self.lut = nn.Embedding(vocab_size, d_model)
     self.d_model = d_model
-    self.decoder_blocks = [DecoderBlock(d_model, d_k, d_v, n_heads, dim_feedfwd) for _ in range(n_decoder_blocks)]
+    self.decoder_blocks = nn.ModuleList([DecoderBlock(d_model, d_k, d_v, n_heads, dim_feedfwd) for _ in range(n_decoder_blocks)])
     self.positional_encoder = positional_encoding.PositionalEncoding(d_model)
 
   def forward(self, encoding: T.Tensor, tokens: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:

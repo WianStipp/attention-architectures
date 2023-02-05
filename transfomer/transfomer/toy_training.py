@@ -3,6 +3,7 @@
 from typing import List, Tuple, NamedTuple, Sequence
 import random
 import torch as T
+from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
@@ -14,7 +15,7 @@ START_TOK = 0
 EOS_TOK = 1
 
 # TRAINING ARGS
-BATCH_SIZE = 8
+BATCH_SIZE = 64
 
 class TrainingPoint(NamedTuple):
   encoder_tokens: T.Tensor
@@ -60,7 +61,7 @@ def make_dataset(n_examples: int, max_vocab_tok: int):
   input_output_sequences: List[Tuple[T.Tensor, T.Tensor]] = []
   for _ in range(n_examples):
     seq_len = random.randint(1, MAX_TRAINING_SEQ_LEN)
-    x = T.randint(low=1, high=max_vocab_tok+1, size=(seq_len, )).type(T.long)
+    x = T.randint(low=1, high=max_vocab_tok, size=(seq_len, )).type(T.long)
     y = T.flip(x, (0, ))
     input_output_sequences.append((x,y))
   return ToyDataset(input_output_sequences)
@@ -71,16 +72,26 @@ def apply_start_end_tokens(x: T.Tensor, include_end: bool = True) -> T.Tensor:
   return T.concat([T.Tensor((START_TOK, )), x], dim=0).type(T.long)
 
 def main() -> None:
-  config = modeling.TransfomerConfig(vocab_size=100, d_model=512, d_k=64, d_v=64, n_attn_heads_in_encoder=8,\
+  config = modeling.TransfomerConfig(vocab_size=10, d_model=512, d_k=64, d_v=64, n_attn_heads_in_encoder=8,\
                                       n_attn_heads_in_decoder=8, n_decoder_blocks=6, n_encoder_blocks=6, dim_feedfwd=2048\
                                     )
-  model = modeling.Transformer(config)
-  dataset = make_dataset(1000, max_vocab_tok=config.vocab_size)
+  dataset = make_dataset(10000, max_vocab_tok=config.vocab_size)
   dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_trainingpoints)
-
-  for b in dataloader:
-    print(b)
-    break
+  device = T.device('cuda' if T.cuda.is_available() else 'cpu')
+  model = modeling.Transformer(config)
+  model = model.to(device)
+  optimizer = optim.Adam(model.parameters(), lr=0.001)
+  model.train()
+  for inputs, decodings, target in dataloader:
+    optimizer.zero_grad()
+    inputs = inputs.to(device)
+    decodings = decodings.to(device)
+    target = target.to(device)
+    out = model(inputs, decodings)
+    loss = F.cross_entropy(out, target, label_smoothing=0.1)
+    loss.backward()
+    print(loss)
+    optimizer.step()
 
 if __name__ == '__main__':
   main()
