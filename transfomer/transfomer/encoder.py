@@ -23,8 +23,7 @@ class Encoder(nn.Module):
       tokens: A sequence of tokens, with shape: (batch_size, n_tokens)
     """
     embedding = self.lut(tokens) # batch_size * n_tokens * embedding dim
-    positional_encoding = self.positional_encoder(embedding)
-    embedding += positional_encoding
+    embedding += self.positional_encoder(embedding)
     for block in self.encoder_blocks:
       embedding = block(embedding, attention_mask)
     return embedding
@@ -36,12 +35,12 @@ class EncoderBlock(nn.Module):
     self.multihead_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
     self.feedfwd = nn.Linear(d_model, d_model)
 
-  def forward(self, E: T.Tensor, attention_mask: Optional[T.Tensor] = None) -> T.Tensor:
+  def forward(self, E: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
     """
     Encoder block takes in an encoding of dims:
      (batch_size, token_len, embedding_dim)
     """
-    self_attn = self.multihead_attn(Q=E, K=E, V=E)
+    self_attn = self.multihead_attn(Q=E, K=E, V=E, mask=mask)
     sublayer = F.layer_norm(self_attn + E, normalized_shape=(self.d_model, ))
     return F.layer_norm(self.feedfwd(sublayer) + sublayer, normalized_shape=(self.d_model, ))
 

@@ -37,12 +37,10 @@ class Attention(nn.Module):
     QW = self.query_projection(Q)
     KW = self.key_projection(K)
     VW = self.value_projection(V)
-    if not mask:
-      batch_size, n_tokens = Q.size(0), Q.size(1)
-      mask = T.ones(batch_size, n_tokens)
-    mask = (1 - T.bmm(mask[:,:,None], mask[:,None,:])) * -1e9
     scores = T.bmm(QW, T.swapaxes(KW, -1, -2)) # BS, n_toks, n_toks
-    scores += mask
+    if mask:
+      mask = (1 - T.bmm(mask[:,:,None], mask[:,None,:])) * -1e9
+      scores += mask
     return T.bmm(T.softmax(scores, dim=-1) / self.d_k ** 1/2, VW)
 
 if __name__ == "__main__":
