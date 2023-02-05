@@ -76,21 +76,25 @@ def main() -> None:
                                       n_attn_heads_in_decoder=8, n_decoder_blocks=6, n_encoder_blocks=6, dim_feedfwd=2048\
                                     )
   dataset = make_dataset(10000, max_vocab_tok=config.vocab_size)
+  dataset = [dataset[0] for _ in range(10000)]
   dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_trainingpoints)
   device = T.device('cuda' if T.cuda.is_available() else 'cpu')
   model = modeling.Transformer(config)
   model = model.to(device)
   optimizer = optim.Adam(model.parameters(), lr=0.001)
   model.train()
+  running_loss = []
   for inputs, decodings, target in dataloader:
     optimizer.zero_grad()
     inputs = inputs.to(device)
     decodings = decodings.to(device)
     target = target.to(device)
     out = model(inputs, decodings)
-    loss = F.cross_entropy(out, target, label_smoothing=0.1)
+    loss = F.cross_entropy(out, target, label_smoothing=0.00)
     loss.backward()
-    print(loss)
+    running_loss.append(loss)
+    if len(running_loss) >= 50:
+      print(sum(running_loss[-50:]) / 50)
     optimizer.step()
 
 if __name__ == '__main__':

@@ -32,29 +32,27 @@ class Attention(nn.Module):
       Q: BS * n_tokens * model_dims
       K: BS * n_tokens * model_dims
       V: BS * n_tokens * model_dims
-      mask: BS * n_tokens
+      mask: BS * n_tokens or BS * n_tokens * n_tokens. Use the former
+        for masking padded tokens and the latter for causal attention masking.
     """
     QW = self.query_projection(Q)
     KW = self.key_projection(K)
     VW = self.value_projection(V)
     scores = T.bmm(QW, T.swapaxes(KW, -1, -2)) # BS, n_toks, n_toks
-    if mask:
+    if mask and len(mask.shape) == 2: # mask for padding purposes
       mask = (1 - T.bmm(mask[:,:,None], mask[:,None,:])) * -1e9
+      scores += mask
+    elif mask and len(mask.shape) == 3: # mask for causual attention
+      mask = mask * -1e9
       scores += mask
     return T.bmm(T.softmax(scores, dim=-1) / self.d_k ** 1/2, VW)
 
-if __name__ == "__main__":
-  batch_size, n_tokens = 8, 69
-  d_model, d_k, d_v, d_o, n_heads = 512, 64, 64, 64, 8
-  attn = Attention(d_model, d_k, d_v)
-  Q = T.randn(batch_size, n_tokens, d_model)
-  K = T.randn(batch_size, n_tokens, d_model)
-  V = T.randn(batch_size, n_tokens, d_model)
-  outputs = attn(Q, K, V)
-  print(outputs)
-  print(outputs.shape)
+def make_causal_mask(embeddings: T.Tensor) -> T.Tensor:
+  """Generate a causual attention mask from the input embeddings.
+  Args:
+    embeddings: BS * n_tokens * embedding_dim
+  Returns:
+    causal attention mask of shape (BS, n_tokens, embedding_dim)
+  """
 
-  multihead_attn = MultiHeadAttention(d_model, d_k, d_v, n_heads * d_v, n_heads)
-  outputs = multihead_attn(Q, K, V)
-  print(outputs)
-  print(outputs.shape)
+
