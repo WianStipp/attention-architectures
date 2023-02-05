@@ -4,5 +4,5 @@ To do:
 
 - [x] positional encoding
 - [x] attention mask
-- [ ] decoder blocks
+- [x] decoder blocks
 - [ ] training script

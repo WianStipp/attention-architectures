@@ -9,6 +9,19 @@ from transfomer import attn, positional_encoding
 
 MAX_SEQUENCE_LENGTH = 10000
 
+class Feedforward(nn.Module):
+  """
+  Feedforward network as described in Vaswani et al.
+  FFN(x) = max(0, xW_1 + b)W_2 + b
+  """
+  def __init__(self, d_model: int) -> None:
+    super().__init__()
+    self.linear1 = nn.Linear(d_model, d_model)
+    self.linear2 = nn.Linear(d_model, d_model)
+
+  def forward(self, inputs: T.Tensor) -> T.Tensor:
+    return self.linear2(F.relu(self.linear1(inputs)))
+
 class Encoder(nn.Module):
   def __init__(self, vocab_size: int, d_model: int, d_k: int, d_v: int, n_heads: int, n_encoder_blocks: int) -> None:
     super().__init__()
@@ -33,7 +46,7 @@ class EncoderBlock(nn.Module):
     super().__init__()
     self.d_model = d_model
     self.multihead_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
-    self.feedfwd = nn.Linear(d_model, d_model)
+    self.feedfwd = Feedforward(d_model)
 
   def forward(self, E: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
     """

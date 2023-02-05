@@ -5,7 +5,7 @@ import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
 
-from transfomer import attn, positional_encoding
+from transfomer import attn, positional_encoding, encoding
 
 class Decoder(nn.Module):
   def __init__(self, vocab_size: int, d_model: int, d_k: int, d_v: int, n_heads: int, n_decoder_blocks: int) -> None:
@@ -29,7 +29,7 @@ class DecoderBlock(nn.Module):
     self.d_model = d_model
     self.multihead_self_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
     self.multihead_cross_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
-    self.feedfwd = nn.Linear(d_model, d_model)
+    self.feedfwd = encoding.Feedforward(d_model)
 
   def forward(self, encoding: T.Tensor, prev_outputs: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
     self_attn = self.multihead_self_attn(Q=prev_outputs, K=prev_outputs, V=prev_outputs, mask=mask)
