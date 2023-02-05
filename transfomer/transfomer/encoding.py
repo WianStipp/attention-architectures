@@ -44,17 +44,3 @@ class EncoderBlock(nn.Module):
     sublayer = F.layer_norm(self_attn + E, normalized_shape=(self.d_model, ))
     return F.layer_norm(self.feedfwd(sublayer) + sublayer, normalized_shape=(self.d_model, ))
 
-if __name__ == "__main__":
-  batch_size, n_tokens = 8, 69
-  vocab_size = 50000
-  d_model, d_k, d_v, n_heads, n_encoders = 512, 64, 64, 8, 6
-  encoder = Encoder(vocab_size, d_model, d_k, d_v, n_heads, n_encoders)
-  import tiktoken
-  tokenizer = tiktoken.get_encoding("gpt2")
-  encodings = tokenizer.encode_batch(['hello world!', "good day, earth!"])
-  max_len = max(map(len, encodings))
-  encodings = [e + [0 for _ in range(max_len - len(e))] for e in encodings]
-  toks = T.Tensor(encodings).long()
-  output = encoder(toks)
-  print(output)
-  print(output.shape)

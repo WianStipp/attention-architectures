@@ -35,6 +35,19 @@ class Transformer(nn.Module):
 
   def forward(self, input_tokens: T.Tensor, decoded_tokens: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
     encoder_output = self.encoder(input_tokens, mask)
-    decoder_output = self.decoder(encoder_output, decoder_output, mask)
-    logits = self.linear(decoded_tokens) # (BS, vocab_size)
+    decoder_output = self.decoder(encoder_output, decoded_tokens, mask)
+    logits = self.linear(decoder_output) # (BS, vocab_size)
     return F.softmax(logits, dim=1)
+
+if __name__ == "__main__":
+  import tiktoken
+  tokenizer = tiktoken.get_encoding("gpt2")
+  encodings = tokenizer.encode_batch(['hello world!', "good day, earth!"])
+  max_len = max(map(len, encodings))
+  encodings = [e + [0 for _ in range(max_len - len(e))] for e in encodings]
+  toks = T.Tensor(encodings).long()
+  config = TransfomerConfig(50000, 512, 8, 8, 8, 8, 6, 6)
+  model = Transformer(config)
+  out = model(toks, toks)
+  print(out.shape)
+  print(out[0])
