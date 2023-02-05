@@ -1,9 +1,10 @@
 """Toy training script to make sure the model is learning as expected."""
 
-from typing import List, Tuple, NamedTuple
+from typing import List, Tuple, NamedTuple, Sequence
 import random
 import torch as T
-from torch.utils.data import Dataset
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
 
 from transfomer import modeling
 
@@ -11,6 +12,9 @@ MAX_TRAINING_SEQ_LEN = 32
 PAD_TOK = 0
 START_TOK = 0
 EOS_TOK = 1
+
+# TRAINING ARGS
+BATCH_SIZE = 8
 
 class TrainingPoint(NamedTuple):
   encoder_tokens: T.Tensor
@@ -38,6 +42,16 @@ class ToyDataset(Dataset):
   def __getitem__(self, index) -> TrainingPoint:
     return self.data[index]
 
+def collate_trainingpoints(trainingpoints: Sequence[TrainingPoint]) -> TrainingPoint:
+  encoder_toks = [t.encoder_tokens for t in trainingpoints]
+  decoder_toks = [t.decoder_tokens for t in trainingpoints]
+  target_toks = T.concat([t.target_token[None] for t in trainingpoints], dim=0)
+  max_encoder_len = len(max(encoder_toks, key=len))
+  max_decoder_len = len(max(decoder_toks, key=len))
+  encoder_toks = T.vstack([F.pad(input=e, pad=(0,max_encoder_len - len(e)), mode='constant', value=PAD_TOK) for e in encoder_toks])
+  decoder_toks = T.vstack([F.pad(d, (max_decoder_len - len(d),0), 'constant', PAD_TOK) for d in decoder_toks])
+  return TrainingPoint(encoder_toks, decoder_toks, target_toks)
+
 def make_dataset(n_examples: int, max_vocab_tok: int):
   """
   Toy dataset where we encode a random sequence, and the task is to decode it backwards.
@@ -61,9 +75,12 @@ def main() -> None:
                                       n_attn_heads_in_decoder=8, n_decoder_blocks=6, n_encoder_blocks=6, dim_feedfwd=2048\
                                     )
   model = modeling.Transformer(config)
-  dataset = make_dataset(1, max_vocab_tok=config.vocab_size)
-  for d in dataset:
-    print(d)
+  dataset = make_dataset(1000, max_vocab_tok=config.vocab_size)
+  dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_trainingpoints)
+
+  for b in dataloader:
+    print(b)
+    break
 
 if __name__ == '__main__':
   main()
