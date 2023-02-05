@@ -8,11 +8,11 @@ import torch.nn.functional as F
 from transfomer import attn, positional_encoding, encoding
 
 class Decoder(nn.Module):
-  def __init__(self, vocab_size: int, d_model: int, d_k: int, d_v: int, n_heads: int, n_decoder_blocks: int) -> None:
+  def __init__(self, vocab_size: int, d_model: int, dim_feedfwd: int, d_k: int, d_v: int, n_heads: int, n_decoder_blocks: int) -> None:
     super().__init__()
     self.lut = nn.Embedding(vocab_size, d_model)
     self.d_model = d_model
-    self.decoder_blocks = [DecoderBlock(d_model, d_k, d_v, n_heads) for _ in range(n_decoder_blocks)]
+    self.decoder_blocks = [DecoderBlock(d_model, d_k, d_v, n_heads, dim_feedfwd) for _ in range(n_decoder_blocks)]
     self.positional_encoder = positional_encoding.PositionalEncoding(d_model)
 
   def forward(self, encoding: T.Tensor, tokens: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
@@ -24,17 +24,17 @@ class Decoder(nn.Module):
     return embedding
 
 class DecoderBlock(nn.Module):
-  def __init__(self, d_model: int, d_k: int, d_v: int, n_heads: int) -> None:
+  def __init__(self, d_model: int, d_k: int, d_v: int, n_heads: int, dim_feedfwd: int) -> None:
     super().__init__()
     self.d_model = d_model
     self.multihead_self_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
     self.multihead_cross_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
-    self.feedfwd = encoding.Feedforward(d_model)
+    self.feedfwd = encoding.Feedforward(d_model, dim_feedfwd)
 
   def forward(self, encoding: T.Tensor, prev_outputs: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
     self_attn = self.multihead_self_attn(Q=prev_outputs, K=prev_outputs, V=prev_outputs, mask=mask)
     sublayer = F.layer_norm(self_attn + prev_outputs, normalized_shape=(self.d_model, ))
-    cross_attn = self.multihead_cross_attn(Q=encoding, K=encoding, V=sublayer, mask=None) # is no masking correct??
+    cross_attn = self.multihead_cross_attn(Q=sublayer, K=encoding, V=encoding, mask=None) # is no masking correct??
     sublayer2 = F.layer_norm(cross_attn + sublayer, normalized_shape=(self.d_model, ))
     dense_out = self.feedfwd(sublayer2)
     return F.layer_norm(dense_out+ sublayer2, normalized_shape=(self.d_model, ))
