@@ -47,12 +47,11 @@ class Attention(nn.Module):
       scores += mask
     return T.bmm(T.softmax(scores, dim=-1) / self.d_k ** 1/2, VW)
 
-def make_causal_mask(embeddings: T.Tensor) -> T.Tensor:
+def make_causal_mask(size: int) -> T.Tensor:
   """Generate a causual attention mask from the input embeddings.
   Args:
     embeddings: BS * n_tokens * embedding_dim
   Returns:
     causal attention mask of shape (BS, n_tokens, embedding_dim)
   """
-
-
+  return T.tril(T.ones(size, size))

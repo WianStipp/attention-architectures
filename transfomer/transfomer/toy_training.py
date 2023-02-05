@@ -1,13 +1,13 @@
 """Toy training script to make sure the model is learning as expected."""
 
-from typing import List, Tuple, NamedTuple, Sequence
+from typing import List, Tuple, NamedTuple, Sequence, Optional
 import random
 import torch as T
 from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
-from transfomer import modeling
+from transfomer import modeling, attn
 
 MAX_TRAINING_SEQ_LEN = 32
 PAD_TOK = 0
@@ -15,12 +15,13 @@ START_TOK = 0
 EOS_TOK = 1
 
 # TRAINING ARGS
-BATCH_SIZE = 64
+BATCH_SIZE = 2
 
 class TrainingPoint(NamedTuple):
   encoder_tokens: T.Tensor
   decoder_tokens: T.Tensor
-  target_token: T.Tensor
+  encoder_mask: Optional[T.Tensor]
+  decoder_mask: Optional[T.Tensor]
 
 class ToyDataset(Dataset):
   def __init__(self, input_output_sequences: List[Tuple[T.Tensor, T.Tensor]]) -> None:
@@ -30,12 +31,8 @@ class ToyDataset(Dataset):
   def _prepare_data(self) -> None:
     self.data = []
     for input, target in self.input_output_sequences:
-      input = apply_start_end_tokens(input)
       target = apply_start_end_tokens(target)
-      for i in range(1, len(target)):
-        t = target[i]
-        decode_toks = target[:i]
-        self.data.append(TrainingPoint(input, decode_toks, t))
+      self.data.append(TrainingPoint(input, target, T.ones(len(input)), attn.make_causal_mask(len(target))))
 
   def __len__(self) -> int:
     return len(self.data)
@@ -45,13 +42,18 @@ class ToyDataset(Dataset):
 
 def collate_trainingpoints(trainingpoints: Sequence[TrainingPoint]) -> TrainingPoint:
   encoder_toks = [t.encoder_tokens for t in trainingpoints]
+  encoder_mask = [t.encoder_mask for t in trainingpoints]
   decoder_toks = [t.decoder_tokens for t in trainingpoints]
-  target_toks = T.concat([t.target_token[None] for t in trainingpoints], dim=0)
+  decoder_mask = [t.decoder_mask for t in trainingpoints]
+  assert not any([m is None for m in encoder_mask])
+  assert not any([m is None for m in decoder_mask])
   max_encoder_len = len(max(encoder_toks, key=len))
   max_decoder_len = len(max(decoder_toks, key=len))
   encoder_toks = T.vstack([F.pad(input=e, pad=(0,max_encoder_len - len(e)), mode='constant', value=PAD_TOK) for e in encoder_toks])
-  decoder_toks = T.vstack([F.pad(d, (max_decoder_len - len(d),0), 'constant', PAD_TOK) for d in decoder_toks])
-  return TrainingPoint(encoder_toks, decoder_toks, target_toks)
+  decoder_toks = T.vstack([F.pad(d, (0, max_decoder_len - len(d)), 'constant', PAD_TOK) for d in decoder_toks])
+  encoder_mask = T.vstack([F.pad(input=m, pad=(0,max_encoder_len - len(m)), mode='constant', value=PAD_TOK) for m in encoder_mask])
+  decoder_mask = T.stack([F.pad(input=m, pad=(0,max_decoder_len - len(m),0,max_decoder_len - len(m)), mode='constant', value=PAD_TOK) for m in decoder_mask])
+  return TrainingPoint(encoder_toks, decoder_toks, encoder_mask, decoder_mask)
 
 def make_dataset(n_examples: int, max_vocab_tok: int):
   """
@@ -61,7 +63,7 @@ def make_dataset(n_examples: int, max_vocab_tok: int):
   input_output_sequences: List[Tuple[T.Tensor, T.Tensor]] = []
   for _ in range(n_examples):
     seq_len = random.randint(1, MAX_TRAINING_SEQ_LEN)
-    x = T.randint(low=1, high=max_vocab_tok, size=(seq_len, )).type(T.long)
+    x = T.randint(low=2, high=max_vocab_tok, size=(seq_len, )).type(T.long)
     y = T.flip(x, (0, ))
     input_output_sequences.append((x,y))
   return ToyDataset(input_output_sequences)
@@ -76,7 +78,6 @@ def main() -> None:
                                       n_attn_heads_in_decoder=8, n_decoder_blocks=6, n_encoder_blocks=6, dim_feedfwd=2048\
                                     )
   dataset = make_dataset(10000, max_vocab_tok=config.vocab_size)
-  dataset = [dataset[0] for _ in range(10000)]
   dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_trainingpoints)
   device = T.device('cuda' if T.cuda.is_available() else 'cpu')
   model = modeling.Transformer(config)
@@ -84,7 +85,15 @@ def main() -> None:
   optimizer = optim.Adam(model.parameters(), lr=0.001)
   model.train()
   running_loss = []
-  for inputs, decodings, target in dataloader:
+  for inputs, target, inputs_mask, target_mask in dataloader:
+
+    print(inputs)
+    print(inputs_mask)
+    print(target)
+    print(target_mask[0])
+    print(target_mask[1])
+    exit()
+
     optimizer.zero_grad()
     inputs = inputs.to(device)
     decodings = decodings.to(device)
