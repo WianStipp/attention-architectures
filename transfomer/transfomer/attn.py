@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import torch as T
 import torch.nn as nn
 
@@ -12,8 +12,8 @@ class MultiHeadAttention(nn.Module):
     self.heads: List[Attention] = [Attention(d_model, d_k, d_v) for _ in range(n_heads)]
     self.output_projection = nn.Linear(n_heads * d_v, d_model)
 
-  def forward(self, Q: T.Tensor, K: T.Tensor, V: T.Tensor) -> T.Tensor:
-    head_outputs = T.concat([head(Q, K, V) for head in self.heads], dim=-1)
+  def forward(self, Q: T.Tensor, K: T.Tensor, V: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
+    head_outputs = T.concat([head(Q, K, V, mask) for head in self.heads], dim=-1)
     return self.output_projection(head_outputs)
 
 class Attention(nn.Module):
@@ -26,17 +26,24 @@ class Attention(nn.Module):
     self.key_projection = nn.Linear(d_model, d_k)
     self.value_projection = nn.Linear(d_model, d_v)
 
-  def forward(self, Q: T.Tensor, K: T.Tensor, V: T.Tensor) -> T.Tensor:
+  def forward(self, Q: T.Tensor, K: T.Tensor, V: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
     """Compute attention given the query, keys and values.
     Args:
       Q: BS * n_tokens * model_dims
       K: BS * n_tokens * model_dims
       V: BS * n_tokens * model_dims
+      mask: BS * n_tokens
     """
     QW = self.query_projection(Q)
     KW = self.key_projection(K)
     VW = self.value_projection(V)
-    return T.bmm(T.softmax(T.bmm(QW, T.swapaxes(KW, -1, -2)), dim=-1) / self.d_k ** 1/2, VW)
+    if not mask:
+      batch_size, n_tokens = Q.size(0), Q.size(1)
+      mask = T.ones(batch_size, n_tokens)
+    mask = (1 - T.bmm(mask[:,:,None], mask[:,None,:])) * -1e9
+    scores = T.bmm(QW, T.swapaxes(KW, -1, -2)) # BS, n_toks, n_toks
+    scores += mask
+    return T.bmm(T.softmax(scores, dim=-1) / self.d_k ** 1/2, VW)
 
 if __name__ == "__main__":
   batch_size, n_tokens = 8, 69

@@ -1,6 +1,6 @@
 """This module contains the encoder."""
 
-from typing import Sequence
+from typing import Optional
 import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,16 +17,16 @@ class Encoder(nn.Module):
     self.encoder_blocks = [EncoderBlock(d_model, d_k, d_v, n_heads) for _ in range(n_encoder_blocks)]
     self.positional_encoder = positional_encoding.PositionalEncoding(d_model)
 
-  def forward(self, tokens: Sequence[Sequence[int]]) -> T.Tensor:
+  def forward(self, tokens: T.Tensor, attention_mask: Optional[T.Tensor] = None) -> T.Tensor:
     """Do a forward pass through the encoder
     Args:
-      tokens: A sequence of sequences of tokens.
+      tokens: A sequence of tokens, with shape: (batch_size, n_tokens)
     """
     embedding = self.lut(tokens) # batch_size * n_tokens * embedding dim
     positional_encoding = self.positional_encoder(embedding)
     embedding += positional_encoding
     for block in self.encoder_blocks:
-      embedding = block(embedding)
+      embedding = block(embedding, attention_mask)
     return embedding
 
 class EncoderBlock(nn.Module):
@@ -36,7 +36,7 @@ class EncoderBlock(nn.Module):
     self.multihead_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
     self.feedfwd = nn.Linear(d_model, d_model)
 
-  def forward(self, E: T.Tensor) -> T.Tensor:
+  def forward(self, E: T.Tensor, attention_mask: Optional[T.Tensor] = None) -> T.Tensor:
     """
     Encoder block takes in an encoding of dims:
      (batch_size, token_len, embedding_dim)

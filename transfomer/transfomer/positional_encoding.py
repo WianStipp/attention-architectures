@@ -6,12 +6,14 @@ from torch.autograd import Variable
 MAX_SEQ_LENGTH = 10000
 
 class PositionalEncoding(nn.Module):
-  """Encodes sequence positions into the transformer."""
+  """Encodes sequence positions into the transformer.
+
+  PE(pos, 2i) = sin(pos / MAX_SEQ_LEN ** (2*i/d_model))
+  PE(pos, 2i+1) = cos(pos / MAX_SEQ_LEN ** (2*i/d_model))
+    pos is the token position, i is the dimention
+  """
   def __init__(self, d_model: int) -> None:
     super().__init__()
-    # pos is the token position, i is the dimention
-    # PE(pos, 2i) = sin(pos / MAX_SEQ_LEN ** (2*i/d_model))
-    # PE(pos, 2i+1) = cos(pos / MAX_SEQ_LEN ** (2*i/d_model))
     # (MAX_SEQ, d_model) shape
     numerator = T.stack([T.arange(0,MAX_SEQ_LENGTH) for _ in range(d_model)]).T
     denominator = (MAX_SEQ_LENGTH ** ((2*T.arange(d_model))/d_model))
