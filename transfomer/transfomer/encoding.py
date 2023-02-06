@@ -47,6 +47,8 @@ class EncoderBlock(nn.Module):
     self.d_model = d_model
     self.multihead_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
     self.feedfwd = Feedforward(d_model, dim_feedfwd)
+    self.dropout = nn.Dropout(0.1)
+    self.dropout2 = nn.Dropout(0.1)
 
   def forward(self, E: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
     """
@@ -54,6 +56,6 @@ class EncoderBlock(nn.Module):
      (batch_size, token_len, embedding_dim)
     """
     self_attn = self.multihead_attn(Q=E, K=E, V=E, mask=mask)
-    sublayer = F.layer_norm(self_attn + E, normalized_shape=(self.d_model, ))
-    return F.layer_norm(self.feedfwd(sublayer) + sublayer, normalized_shape=(self.d_model, ))
+    sublayer = F.layer_norm(self.dropout(self_attn) + E, normalized_shape=(self.d_model, ))
+    return F.layer_norm(self.dropout2(self.feedfwd(sublayer)) + sublayer, normalized_shape=(self.d_model, ))
 

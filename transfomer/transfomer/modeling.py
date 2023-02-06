@@ -36,11 +36,12 @@ class Transformer(nn.Module):
                                     self.config.d_k, self.config.d_v, \
                                       self.config.n_attn_heads_in_decoder, self.config.n_decoder_blocks
                                       )
+    self.decoder.lut = self.encoder.lut
     self.linear = nn.Linear(self.config.d_model, self.config.vocab_size)
 
   def forward(self, input_tokens: T.Tensor, target_tokens: T.Tensor, input_mask: Optional[T.Tensor] = None, target_mask: Optional[T.Tensor] = None) -> T.Tensor:
     encoder_output = self.encoder(input_tokens, input_mask)
-    decoder_output = self.decoder(encoder_output, target_tokens, target_mask) # (BS, n_toks, d_model)
+    decoder_output = self.decoder(encoder_output, target_tokens, input_mask, target_mask) # (BS, n_toks, d_model)
     logits = self.linear(decoder_output) # (BS, n_target_toks, vocab_size)
     if target_tokens is None:
       loss = None
@@ -50,7 +51,6 @@ class Transformer(nn.Module):
       targets[targets == self.config.end_token] = -100 # ignore these
       targets[:,1:][targets[:,1:] == self.config.pad_token] = -100 # prediction on the end token
       loss = F.cross_entropy(T.swapaxes(logits,-2,-1), targets, label_smoothing=self.config.label_smoothing)
-      print(targets[0], logits[0])
     return logits, loss
 
 if __name__ == "__main__":

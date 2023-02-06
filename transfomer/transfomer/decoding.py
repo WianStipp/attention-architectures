@@ -15,12 +15,12 @@ class Decoder(nn.Module):
     self.decoder_blocks = nn.ModuleList([DecoderBlock(d_model, d_k, d_v, n_heads, dim_feedfwd) for _ in range(n_decoder_blocks)])
     self.positional_encoder = positional_encoding.PositionalEncoding(d_model)
 
-  def forward(self, encoding: T.Tensor, tokens: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
+  def forward(self, encoding: T.Tensor, tokens: T.Tensor, input_mask: Optional[T.Tensor] = None, target_mask: Optional[T.Tensor] = None) -> T.Tensor:
     """Do a single forward pass through the decoder."""
     embedding = self.lut(tokens)
     embedding += self.positional_encoder(embedding)
     for block in self.decoder_blocks:
-      embedding = block(encoding, embedding, mask)
+      embedding = block(encoding, embedding, input_mask, target_mask)
     return embedding
 
 class DecoderBlock(nn.Module):
@@ -30,11 +30,14 @@ class DecoderBlock(nn.Module):
     self.multihead_self_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
     self.multihead_cross_attn = attn.MultiHeadAttention(d_model, d_k, d_v, d_v*n_heads, n_heads)
     self.feedfwd = encoding.Feedforward(d_model, dim_feedfwd)
+    self.dropout1 = nn.Dropout(0.1)
+    self.dropout2 = nn.Dropout(0.1)
+    self.dropout3 = nn.Dropout(0.1)
 
-  def forward(self, encoding: T.Tensor, prev_outputs: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
-    self_attn = self.multihead_self_attn(Q=prev_outputs, K=prev_outputs, V=prev_outputs, mask=mask)
-    sublayer = F.layer_norm(self_attn + prev_outputs, normalized_shape=(self.d_model, ))
-    cross_attn = self.multihead_cross_attn(Q=sublayer, K=encoding, V=encoding, mask=None) # is no masking correct??
-    sublayer2 = F.layer_norm(cross_attn + sublayer, normalized_shape=(self.d_model, ))
+  def forward(self, encoding: T.Tensor, prev_outputs: T.Tensor, input_mask: Optional[T.Tensor] = None, target_mask: Optional[T.Tensor] = None) -> T.Tensor:
+    self_attn = self.multihead_self_attn(Q=prev_outputs, K=prev_outputs, V=prev_outputs, mask=target_mask)
+    sublayer = F.layer_norm(self.dropout1(self_attn) + prev_outputs, normalized_shape=(self.d_model, ))
+    cross_attn = self.multihead_cross_attn(Q=sublayer, K=encoding, V=encoding, mask=None)
+    sublayer2 = F.layer_norm(self.dropout2(cross_attn) + sublayer, normalized_shape=(self.d_model, ))
     dense_out = self.feedfwd(sublayer2)
-    return F.layer_norm(dense_out+ sublayer2, normalized_shape=(self.d_model, ))
+    return F.layer_norm(self.dropout3(dense_out)+ sublayer2, normalized_shape=(self.d_model, ))

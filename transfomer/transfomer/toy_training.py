@@ -10,13 +10,13 @@ from torch.utils.data import Dataset, DataLoader
 
 from transfomer import modeling, attn
 
-MAX_TRAINING_SEQ_LEN = 32
+MAX_TRAINING_SEQ_LEN = 10
 PAD_TOK = 0
 START_TOK = 0
 EOS_TOK = 1
 
 # TRAINING ARGS
-BATCH_SIZE = 4
+BATCH_SIZE = 128
 
 class TrainingPoint(NamedTuple):
   encoder_tokens: T.Tensor
@@ -75,7 +75,9 @@ def apply_start_end_tokens(x: T.Tensor, include_end: bool = True) -> T.Tensor:
   return T.concat([T.Tensor((START_TOK, )), x], dim=0).type(T.long)
 
 def main() -> None:
-  config = modeling.TransfomerConfig(vocab_size=5, d_model=512, d_k=64, d_v=64, n_attn_heads_in_encoder=8, \
+  import time
+  time.sleep(3)
+  config = modeling.TransfomerConfig(vocab_size=4, d_model=512, d_k=64, d_v=64, n_attn_heads_in_encoder=8, \
                                     n_attn_heads_in_decoder=8, n_decoder_blocks=6, n_encoder_blocks=6, dim_feedfwd=2048, \
                                     label_smoothing=0.00
                                     )

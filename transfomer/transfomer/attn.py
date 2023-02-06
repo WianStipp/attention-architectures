@@ -40,11 +40,10 @@ class Attention(nn.Module):
     VW = self.value_projection(V)
     scores = T.bmm(QW, T.swapaxes(KW, -1, -2)) # BS, n_toks, n_toks
     if mask is not None and len(mask.shape) == 2: # mask for padding purposes
-      mask = (1 - T.bmm(mask[:,:,None], mask[:,None,:])) * -1e9
-      scores += mask
+      mask = T.bmm(mask[:,:,None], mask[:,None,:])
+      scores[~mask.type(T.bool)] = -float('inf')
     elif mask is not None and len(mask.shape) == 3: # mask for causual attention
-      mask = mask * -1e9
-      scores += mask
+      scores[~mask.type(T.bool)] = -float('inf')
     return T.bmm(T.softmax(scores, dim=-1) / self.d_k ** 1/2, VW)
 
 def make_causal_mask(size: int) -> T.Tensor:
