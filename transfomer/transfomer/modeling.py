@@ -19,6 +19,10 @@ class TransfomerConfig:
   n_decoder_blocks: int
   n_encoder_blocks: int
   dim_feedfwd: int
+  label_smoothing: float
+  start_token: int = 0
+  pad_token: int = 0
+  end_token: int = 1
 
 class Transformer(nn.Module):
   def __init__(self, config: TransfomerConfig) -> None:
@@ -34,11 +38,20 @@ class Transformer(nn.Module):
                                       )
     self.linear = nn.Linear(self.config.d_model, self.config.vocab_size)
 
-  def forward(self, input_tokens: T.Tensor, decoded_tokens: T.Tensor, mask: Optional[T.Tensor] = None) -> T.Tensor:
-    encoder_output = self.encoder(input_tokens, mask)
-    decoder_output = self.decoder(encoder_output, decoded_tokens, mask) # (BS, n_toks, d_model)
-    logits = self.linear(decoder_output[:, -1, :]) # (BS, vocab_size)
-    return logits
+  def forward(self, input_tokens: T.Tensor, target_tokens: T.Tensor, input_mask: Optional[T.Tensor] = None, target_mask: Optional[T.Tensor] = None) -> T.Tensor:
+    encoder_output = self.encoder(input_tokens, input_mask)
+    decoder_output = self.decoder(encoder_output, target_tokens, target_mask) # (BS, n_toks, d_model)
+    logits = self.linear(decoder_output) # (BS, n_target_toks, vocab_size)
+    if target_tokens is None:
+      loss = None
+    else:
+      # len(targets) == len(target_toks) - 1
+      targets = F.pad(target_tokens[:, 1:], pad=(0,1,0,0), mode='constant', value=0)
+      targets[targets == self.config.end_token] = -100 # ignore these
+      targets[:,1:][targets[:,1:] == self.config.pad_token] = -100 # prediction on the end token
+      loss = F.cross_entropy(T.swapaxes(logits,-2,-1), targets, label_smoothing=self.config.label_smoothing)
+      print(targets[0], logits[0])
+    return logits, loss
 
 if __name__ == "__main__":
   import tiktoken

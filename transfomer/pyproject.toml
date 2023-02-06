@@ -10,6 +10,7 @@ python = "^3.8"
 torch = "^1.13.1"
 tiktoken = "^0.1.2"
 datasets = "^2.8.0"
+tqdm = "^4.64.1"
 
 
 [build-system]

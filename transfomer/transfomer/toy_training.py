@@ -1,6 +1,7 @@
 """Toy training script to make sure the model is learning as expected."""
 
-from typing import List, Tuple, NamedTuple, Sequence, Optional
+from typing import List, Tuple, NamedTuple, Sequence, Optional, Iterable
+import tqdm
 import random
 import torch as T
 from torch import optim
@@ -15,7 +16,7 @@ START_TOK = 0
 EOS_TOK = 1
 
 # TRAINING ARGS
-BATCH_SIZE = 2
+BATCH_SIZE = 4
 
 class TrainingPoint(NamedTuple):
   encoder_tokens: T.Tensor
@@ -74,37 +75,29 @@ def apply_start_end_tokens(x: T.Tensor, include_end: bool = True) -> T.Tensor:
   return T.concat([T.Tensor((START_TOK, )), x], dim=0).type(T.long)
 
 def main() -> None:
-  config = modeling.TransfomerConfig(vocab_size=10, d_model=512, d_k=64, d_v=64, n_attn_heads_in_encoder=8,\
-                                      n_attn_heads_in_decoder=8, n_decoder_blocks=6, n_encoder_blocks=6, dim_feedfwd=2048\
+  config = modeling.TransfomerConfig(vocab_size=5, d_model=512, d_k=64, d_v=64, n_attn_heads_in_encoder=8, \
+                                    n_attn_heads_in_decoder=8, n_decoder_blocks=6, n_encoder_blocks=6, dim_feedfwd=2048, \
+                                    label_smoothing=0.00
                                     )
   dataset = make_dataset(10000, max_vocab_tok=config.vocab_size)
-  dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_trainingpoints)
+  # dataset = [dataset[0] for d in dataset]
+  dataloader: Iterable[TrainingPoint] = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_trainingpoints)
   device = T.device('cuda' if T.cuda.is_available() else 'cpu')
   model = modeling.Transformer(config)
   model = model.to(device)
   optimizer = optim.Adam(model.parameters(), lr=0.001)
   model.train()
   running_loss = []
-  for inputs, target, inputs_mask, target_mask in dataloader:
-
-    print(inputs)
-    print(inputs_mask)
-    print(target)
-    print(target_mask[0])
-    print(target_mask[1])
-    exit()
-
-    optimizer.zero_grad()
-    inputs = inputs.to(device)
-    decodings = decodings.to(device)
-    target = target.to(device)
-    out = model(inputs, decodings)
-    loss = F.cross_entropy(out, target, label_smoothing=0.00)
-    loss.backward()
-    running_loss.append(loss)
-    if len(running_loss) >= 50:
-      print(sum(running_loss[-50:]) / 50)
-    optimizer.step()
+  for _ in range(5):
+    for batch in tqdm.tqdm(dataloader, total=len(dataset) // BATCH_SIZE):
+      batch = (b.to(device) for b in batch)
+      optimizer.zero_grad()
+      _, loss = model(*batch)
+      loss.backward()
+      running_loss.append(loss)
+      if len(running_loss) >= 50:
+        print(sum(running_loss[-50:]) / 50)
+      optimizer.step()
 
 if __name__ == '__main__':
   main()
