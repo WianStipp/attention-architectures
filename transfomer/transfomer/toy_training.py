@@ -10,13 +10,13 @@ from torch.utils.data import Dataset, DataLoader
 
 from transfomer import modeling, attn
 
-MAX_TRAINING_SEQ_LEN = 10
+MAX_TRAINING_SEQ_LEN = 128
 PAD_TOK = 0
 START_TOK = 0
 EOS_TOK = 1
 
 # TRAINING ARGS
-BATCH_SIZE = 128
+BATCH_SIZE = 512
 
 class TrainingPoint(NamedTuple):
   encoder_tokens: T.Tensor
@@ -77,27 +77,26 @@ def apply_start_end_tokens(x: T.Tensor, include_end: bool = True) -> T.Tensor:
 def main() -> None:
   import time
   time.sleep(3)
-  config = modeling.TransfomerConfig(vocab_size=4, d_model=512, d_k=64, d_v=64, n_attn_heads_in_encoder=8, \
-                                    n_attn_heads_in_decoder=8, n_decoder_blocks=6, n_encoder_blocks=6, dim_feedfwd=2048, \
-                                    label_smoothing=0.00
+  config = modeling.TransfomerConfig(vocab_size=10, d_model=256, d_k=32, d_v=32, n_attn_heads_in_encoder=8, \
+                                    n_attn_heads_in_decoder=8, n_decoder_blocks=4, n_encoder_blocks=4, dim_feedfwd=1028, \
+                                    label_smoothing=0.01
                                     )
-  dataset = make_dataset(10000, max_vocab_tok=config.vocab_size)
-  # dataset = [dataset[0] for d in dataset]
+  dataset = make_dataset(5000000, max_vocab_tok=config.vocab_size)
   dataloader: Iterable[TrainingPoint] = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_trainingpoints)
   device = T.device('cuda' if T.cuda.is_available() else 'cpu')
   model = modeling.Transformer(config)
   model = model.to(device)
-  optimizer = optim.Adam(model.parameters(), lr=0.001)
+  optimizer = optim.Adam(model.parameters(), lr=0.00005)
   model.train()
   running_loss = []
-  for _ in range(5):
-    for batch in tqdm.tqdm(dataloader, total=len(dataset) // BATCH_SIZE):
+  for _ in range(3):
+    for i, batch in tqdm.tqdm(enumerate(dataloader), total=len(dataset) // BATCH_SIZE):
       batch = (b.to(device) for b in batch)
       optimizer.zero_grad()
       _, loss = model(*batch)
       loss.backward()
       running_loss.append(loss)
-      if len(running_loss) >= 50:
+      if len(running_loss) >= 50 and i % 50 == 0:
         print(sum(running_loss[-50:]) / 50)
       optimizer.step()
 
