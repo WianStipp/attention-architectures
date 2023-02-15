@@ -10,8 +10,8 @@ int main() {
   // bias is included in the X vector
   double *X = malloc(m * n * sizeof(double));
   double *y = malloc(m * sizeof(double));
-
   double *XT = malloc(m * n * sizeof(double));
+  printf("%f\n", X[0]);
 }
 
 void transpose(double *A, int m, int n) {

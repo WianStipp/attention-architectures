@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    "*.jack": "jack",
+    "lapacke.h": "c"
+  }
+}
