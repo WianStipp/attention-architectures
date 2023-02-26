@@ -5,4 +5,4 @@ To do:
 - [x] positional encoding
 - [x] attention mask
 - [x] decoder blocks
-- [ ] training script
+- [x] training script
