@@ -2,6 +2,6 @@
 
 Repository exploring attention mechanisms.
 
-- [ ] Vanilla Transformer
+- [X] Vanilla Transformer
 - [ ] GPT
 - [ ] ColBERT
